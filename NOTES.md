@@ -204,6 +204,60 @@ breaks.
 
 ---
 
+## What a gap actually means (and what it doesn't)
+
+`reconcile.py` does not recover lost conversions. It **detects** them. Those are
+different things, and conflating them oversells what this system does.
+
+### Transient loss — the queue saves it
+
+Meta returns 5xx, or the request times out. The event stays `pending`, the
+worker retries with backoff, and it lands. The retry is safe because `event_id`
+makes Meta deduplicate it.
+
+This is half the reason the queue exists, and here the conversion genuinely is
+rescued.
+
+### Permanent loss — the queue cannot save it, and shouldn't try
+
+Meta returns 4xx. The payload is broken — a malformed hash, a missing required
+field, an invalid currency. Retrying it five times produces five identical
+failures. The conversion is gone from the optimiser's point of view, and Meta
+will never know it existed.
+
+So what is the point of reporting it?
+
+**1. You know you lost something.** Without this, you don't. Not in Events
+Manager, not in the logs, not anywhere. There is no screen in Meta's UI titled
+"events you failed to send us." The discrepancy surfaces weeks later against
+Stripe, if anyone looks.
+
+**2. You know what is broken.** `Invalid parameter` plus a specific `event_id`
+is not "something is being lost somewhere" — it is "this code path builds a
+malformed hash, go fix it." You repair the *cause*, and the next thousand events
+don't get lost.
+
+**3. You know the price.** `$199.00` is not an abstract metric. It is the number
+that decides whether this gets fixed today or next sprint.
+
+The value is in the first point. Without it there is no second or third.
+
+### Could a failed event be re-sent after the bug is fixed?
+
+Technically yes. Nothing was deleted — the event sits in `events` with status
+`failed`, its `user_data` intact. Fix the hashing, reset the status to
+`pending`, and the worker picks it up.
+
+With one hard constraint: **Meta rejects events older than 7 days.** The rescue
+window exists but is not indefinite.
+
+No such tool is included here, deliberately — it would blur the focus, and the
+demo is about detection, not recovery. But the fact that `failed` rows are never
+deleted is what makes it possible at all. A system that drops what it cannot
+deliver forecloses the option entirely.
+
+---
+
 ## Tests: no network, no credentials
 
 `evals/` mocks the HTTP transport entirely. `git clone && pytest` is green on a
