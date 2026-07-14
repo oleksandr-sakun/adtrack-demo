@@ -277,6 +277,77 @@ optimiser spent learning from a lie.
 
 ---
 
+## Where this goes next
+
+The reconciliation layer is the interesting part, and it is deliberately left as
+a command rather than a service. What turns it into monitoring is small, and
+worth writing down.
+
+### Making the gap visible in time
+
+`--exit-code` exists so the invariant can be asserted on a schedule:
+
+    0 * * * * cd /opt/freelance/demo/adtrack && \
+      .venv/bin/python tools/reconcile.py --verbose --exit-code
+
+Cron mails stdout **only on non-zero exit**. Zero gap means silence; a gap means
+a message naming the specific events. That is the correct shape for monitoring —
+quiet while healthy, specific when broken. Not an hourly "all clear" that trains
+you to ignore it.
+
+Cron's default mail goes to the local spool, which nobody reads. In practice the
+destination should be one of:
+
+- **Slack webhook** — the natural fit. Post the gap, the dollar value, and the
+  failing `event_id`s to a channel. Same pattern as any SLA alerter.
+- **Telegram bot** — cheaper to set up, no workspace needed.
+- **Existing alerting (Zabbix, Grafana, PagerDuty)** — expose `gap` as a metric
+  and alert on `gap > 0` sustained for N minutes. Best option where such a stack
+  already exists, because it inherits escalation and on-call routing for free.
+- **`/health` scraped by a probe** — the endpoint already returns `unconfirmed`.
+  A generic HTTP check on that field needs no new code at all.
+
+None of these are implemented. The endpoint and the exit code are; the routing
+is a decision for whoever deploys it, and it is twenty lines in any direction.
+
+### What the gap actually contains
+
+Worth being precise, because "failed events" is too narrow.
+
+    gap = accepted − confirmed_by_meta
+
+Three distinct failures land in it:
+
+1. **`failed`** — retries exhausted. The loud case.
+2. **`pending` that stopped moving** — the worker died. The queue grows, the
+   collector keeps accepting, and nothing errors. Status still says `pending`,
+   forever.
+3. **`delivered`, but Meta said `events_received: 0`** — the silent drop. The
+   row is marked successful. Only comparing against *what Meta actually
+   confirmed* catches it.
+
+The third is why `reconcile.py` does not read `events.status`. It reads
+`deliveries.events_received >= 1` — what Meta said, not what we believe about
+ourselves. A system that audits its own status column will always tell you it is
+fine.
+
+### Other directions, in rough order of value
+
+- **Re-submission tool.** `failed` rows keep their `user_data`. Fix the bug,
+  reset to `pending`, let the worker drain. Constrained by Meta's 7-day window.
+- **Alert on rate, not just count.** A single failure is noise; a failure *rate*
+  climbing is a deploy that just broke hashing. Rate is the signal worth paging
+  on.
+- **Additional destinations.** TikTok Events API, Google Ads offline
+  conversions. Same shape: one client per destination behind the same queue and
+  the same audit trail. The reconciliation logic is destination-agnostic.
+- **Batching**, once per-event auditing is no longer needed at the volume in
+  question. Not before.
+- **Postgres instead of SQLite**, and the worker as its own systemd unit. The
+  queue is the interface, so this touches nothing else.
+
+---
+
 ## The honest limit: accepted is not the same as happened
 
 The invariant this system defends is:
