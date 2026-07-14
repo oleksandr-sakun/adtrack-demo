@@ -242,6 +242,67 @@ that decides whether this gets fixed today or next sprint.
 
 The value is in the first point. Without it there is no second or third.
 
+### The real cost is not the one event
+
+A hashing bug does not lose one conversion. It loses **every conversion of that
+shape, for as long as it lives**.
+
+Three weeks in a deploy, at 200 purchases averaging $50:
+
+- **$10,000** of purchase signal Meta never saw.
+- And, worse: three weeks of the optimiser **learning from incomplete data** —
+  bidding away from audiences that actually convert, because their conversions
+  never arrived.
+
+The second cost outlives the first. Lost conversions are in the past. A
+mis-trained optimiser is *future* money, still being spent in the wrong
+direction until it re-learns.
+
+This is what `--exit-code` is for:
+
+    python tools/reconcile.py --exit-code
+
+One line in cron. It asserts the invariant hourly and fails loudly the moment it
+breaks — instead of the discrepancy surfacing three weeks later against Stripe.
+
+The difference between a bug that lives one hour and a bug that lives three
+weeks is not code quality. There will be bugs either way. It is whether anything
+in the system periodically asks *"did it actually arrive?"* instead of trusting
+a status code.
+
+**The pitch, for anyone spending real money on ads:** the question is not whether
+your tracking will break. It will. The question is whether you find out in an
+hour or in three weeks — and the difference is measured in how long your
+optimiser spent learning from a lie.
+
+---
+
+## The honest limit: accepted is not the same as happened
+
+The invariant this system defends is:
+
+    accepted == confirmed_by_meta
+
+It is **not**:
+
+    happened == confirmed_by_meta
+
+`reconcile.py` catches events that reached the collector and did not reach Meta.
+It cannot catch an event that never reached the collector at all — the browser
+crashed, the network dropped, the user closed the tab before `fetch` completed,
+a request was blocked before it left the page.
+
+Those conversions are invisible to this system, because from its point of view
+they never existed.
+
+Stating this plainly matters. "Nothing will ever be lost" is a promise that
+collapses under contact with reality, and a client who hears it will find the
+hole eventually. What this system actually guarantees is narrower and true:
+
+> You will know about everything that was lost after the point of acceptance.
+
+That is still more than most implementations offer, which is nothing.
+
 ### Could a failed event be re-sent after the bug is fixed?
 
 Technically yes. Nothing was deleted — the event sits in `events` with status
