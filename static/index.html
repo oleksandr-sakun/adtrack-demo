@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which stack fits you? — adtrack-demo</title>
+<style>
+  :root {
+    --ink: #14181f;
+    --muted: #6b7480;
+    --line: #e3e6ea;
+    --accent: #1a56db;
+    --bg: #fafbfc;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 16px/1.55 -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    display: flex;
+    justify-content: center;
+    padding: 48px 20px;
+  }
+  main { width: 100%; max-width: 560px; }
+  .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 32px;
+  }
+  h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: -0.01em; }
+  .sub { margin: 0 0 28px; color: var(--muted); font-size: 14px; }
+  .progress { display: flex; gap: 6px; margin-bottom: 28px; }
+  .progress span {
+    height: 3px; flex: 1; background: var(--line); border-radius: 2px;
+  }
+  .progress span.on { background: var(--accent); }
+  .q { font-weight: 600; margin-bottom: 16px; }
+  button.opt {
+    display: block; width: 100%; text-align: left;
+    padding: 13px 16px; margin-bottom: 8px;
+    background: #fff; border: 1px solid var(--line); border-radius: 7px;
+    font: inherit; color: inherit; cursor: pointer;
+    transition: border-color .12s, background .12s;
+  }
+  button.opt:hover { border-color: var(--accent); background: #f7f9fe; }
+  input {
+    width: 100%; padding: 12px 14px; margin-bottom: 10px;
+    border: 1px solid var(--line); border-radius: 7px; font: inherit;
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button.primary {
+    width: 100%; padding: 13px;
+    background: var(--accent); color: #fff;
+    border: 0; border-radius: 7px;
+    font: 600 16px/1 inherit; cursor: pointer;
+  }
+  button.primary:disabled { opacity: .45; cursor: not-allowed; }
+  .log {
+    margin-top: 20px; padding: 16px;
+    background: #10141a; color: #b9c2cf;
+    border-radius: 8px;
+    font: 12px/1.7 ui-monospace, "SF Mono", Menlo, monospace;
+    white-space: pre-wrap; word-break: break-all;
+    min-height: 60px;
+  }
+  .log b { color: #7dd3a0; font-weight: 600; }
+  .log i { color: #f0b866; font-style: normal; }
+  .note { margin-top: 14px; font-size: 13px; color: var(--muted); }
+  code { background: #eef0f3; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+</style>
+
+<!-- Meta Pixel -->
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '2277246586437973');
+</script>
+</head>
+
+<body>
+<main>
+  <div class="card">
+    <h1>Which stack fits your next build?</h1>
+    <p class="sub">Three questions. No signup to see the result.</p>
+
+    <div class="progress">
+      <span id="p1" class="on"></span><span id="p2"></span><span id="p3"></span>
+    </div>
+
+    <div id="step1">
+      <div class="q">What are you shipping?</div>
+      <button class="opt" onclick="next(1)">An internal tool</button>
+      <button class="opt" onclick="next(1)">A customer-facing product</button>
+      <button class="opt" onclick="next(1)">A data pipeline</button>
+    </div>
+
+    <div id="step2" hidden>
+      <div class="q">How fast does it need to exist?</div>
+      <button class="opt" onclick="next(2)">This week</button>
+      <button class="opt" onclick="next(2)">This quarter</button>
+      <button class="opt" onclick="next(2)">It needs to outlive me</button>
+    </div>
+
+    <div id="step3" hidden>
+      <div class="q">Where should we send the result?</div>
+      <input id="email" type="email" placeholder="you@company.com" autocomplete="email">
+      <input id="phone" type="tel" placeholder="+380 67 123 4567" autocomplete="tel">
+      <button class="primary" id="submit" onclick="finish()">Get my result</button>
+    </div>
+
+    <div id="done" hidden>
+      <div class="q">Sent.</div>
+      <p class="sub">Both events fired — browser and server — carrying the same
+        <code>event_id</code>. Meta counts one conversion, not two.</p>
+    </div>
+
+    <div class="log" id="log">waiting…</div>
+    <p class="note">Every event below was sent twice on purpose: once by the
+      Pixel from this browser, once by the server via the Conversions API.
+      Deduplication is what makes that safe.</p>
+  </div>
+</main>
+
+<script>
+// ---------------------------------------------------------------------------
+// The whole point of this file.
+//
+// event_id is generated HERE, once, and handed to both the Pixel and the
+// server. Meta deduplicates on (event_name, event_id). If the server minted
+// its own id, Meta would see two distinct conversions and optimise ad spend
+// against a number that is double the truth.
+//
+// The browser is also the only place that can read the _fbp / _fbc cookies,
+// so it forwards them to the server. They are NOT hashed — Meta requires them
+// in plaintext, and hashing them destroys the match rather than protecting it.
+// ---------------------------------------------------------------------------
+
+const log = document.getElementById('log');
+let lines = [];
+
+function print(msg) {
+  lines.unshift(msg);
+  log.innerHTML = lines.slice(0, 6).join('\n');
+}
+
+function newEventId() {
+  return crypto.randomUUID().replace(/-/g, '');
+}
+
+function cookie(name) {
+  const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return m ? m.pop() : null;
+}
+
+async function track(eventName, extra = {}) {
+  const eventId = newEventId();
+
+  // 1. Browser -> Meta, directly.
+  fbq('track', eventName, extra.custom || {}, { eventID: eventId });
+
+  // 2. Browser -> our server -> Meta. Same id.
+  const body = {
+    event_name: eventName,
+    event_id: eventId,
+    event_source_url: location.href,
+    fbp: cookie('_fbp'),
+    fbc: cookie('_fbc'),
+    ...extra.pii,
+    ...extra.custom,
+  };
+
+  try {
+    const res = await fetch('/collect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (json.status === 'duplicate') {
+      print(`<i>${eventName}</i>  ${eventId.slice(0, 12)}…  already accepted`);
+    } else {
+      print(`<b>${eventName}</b>  ${eventId.slice(0, 12)}…  pixel + server`);
+    }
+  } catch (e) {
+    print(`<i>${eventName}</i>  server unreachable — pixel still fired`);
+  }
+}
+
+let step = 1;
+
+function next(from) {
+  document.getElementById('step' + from).hidden = true;
+  step = from + 1;
+  document.getElementById('step' + step).hidden = false;
+  document.getElementById('p' + step).classList.add('on');
+}
+
+function finish() {
+  const email = document.getElementById('email').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+
+  const btn = document.getElementById('submit');
+  btn.disabled = true;
+
+  track('CompleteRegistration', { pii: { email, phone } });
+
+  // A real funnel would fire Purchase on payment. Here it follows the lead so
+  // the demo exercises value/currency and the full identifier set.
+  track('Purchase', {
+    pii: { email, phone },
+    custom: { value: 49.90, currency: 'USD' },
+  });
+
+  document.getElementById('step3').hidden = true;
+  document.getElementById('done').hidden = false;
+}
+
+// Fires on load. The pixel sets _fbp on its first run, so give it a moment —
+// otherwise the very first event ships without the browser-id cookie and the
+// match quality for that one event is needlessly worse.
+setTimeout(() => track('ViewContent'), 400);
+</script>
+</body>
+</html>
