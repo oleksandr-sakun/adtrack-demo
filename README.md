@@ -115,10 +115,40 @@ pip install -r requirements.txt
 pytest evals/ -v
 ```
 
-15 tests, ~1 second, **no network and no credentials required**. The suite mocks
-Meta's transport entirely — it is green on a machine that has never seen an
-access token, because a suite that needs live API access is a suite that gets
-skipped, and a skipped test protects nothing.
+```
+evals/test_pipeline.py::test_email_normalised_before_hashing      PASSED
+evals/test_pipeline.py::test_phone_normalised_to_digits           PASSED
+evals/test_pipeline.py::test_cookies_and_ip_are_not_hashed        PASSED
+evals/test_pipeline.py::test_empty_identifiers_are_omitted        PASSED
+evals/test_pipeline.py::test_same_event_id_accepted_once          PASSED
+evals/test_pipeline.py::test_4xx_is_permanent                     PASSED
+evals/test_pipeline.py::test_5xx_is_transient                     PASSED
+evals/test_pipeline.py::test_timeout_is_transient                 PASSED
+evals/test_pipeline.py::test_200_with_zero_received_is_a_failure  PASSED
+evals/test_pipeline.py::test_successful_delivery_marks_confirmed  PASSED
+evals/test_pipeline.py::test_failed_event_stays_visible_forever   PASSED
+evals/test_pipeline.py::test_retry_ceiling_stops_the_hammering    PASSED
+evals/test_pipeline.py::test_transient_failure_then_recovery      PASSED
+evals/test_pipeline.py::test_token_is_in_body_not_query           PASSED
+evals/test_pipeline.py::test_test_event_code_only_when_set        PASSED
+
+15 passed in 1.15s
+```
+
+**No network and no credentials required.** The suite mocks Meta's transport
+entirely — it is green on a machine that has never seen an access token, because
+a suite that needs live API access is a suite that gets skipped, and a skipped
+test protects nothing.
+
+Read the test names again. None of them assert that the happy path works — the
+happy path is easy, and it is visible. Each one corresponds to a way this
+pipeline can **lie about itself**: a hash that will never match, an identifier
+that looks present but isn't, a 200 that delivered nothing, a failed event
+quietly deleted. Every one of those failures is silent in production.
+
+1.15 seconds is not a vanity metric. It is what makes it safe to let AI tooling
+take large swings at the implementation — a bad swing surfaces in seconds
+instead of in the ad spend.
 
 ### Against a real Meta dataset
 
