@@ -119,7 +119,7 @@ pytest evals/ -v
 evals/test_pipeline.py::test_email_normalised_before_hashing      PASSED
 evals/test_pipeline.py::test_phone_normalised_to_digits           PASSED
 evals/test_pipeline.py::test_cookies_and_ip_are_not_hashed        PASSED
-evals/test_pipeline.py::test_empty_identifiers_are_omitted        PASSED
+evals/test_pipeline.py::test_empty_identifiers_are_omitted_not_blanked   PASSED
 evals/test_pipeline.py::test_same_event_id_accepted_once          PASSED
 evals/test_pipeline.py::test_4xx_is_permanent                     PASSED
 evals/test_pipeline.py::test_5xx_is_transient                     PASSED
@@ -127,7 +127,7 @@ evals/test_pipeline.py::test_timeout_is_transient                 PASSED
 evals/test_pipeline.py::test_200_with_zero_received_is_a_failure  PASSED
 evals/test_pipeline.py::test_successful_delivery_marks_confirmed  PASSED
 evals/test_pipeline.py::test_failed_event_stays_visible_forever   PASSED
-evals/test_pipeline.py::test_retry_ceiling_stops_the_hammering    PASSED
+evals/test_pipeline.py::test_retry_ceiling_stops_the_worker_hammering    PASSED
 evals/test_pipeline.py::test_transient_failure_then_recovery      PASSED
 evals/test_pipeline.py::test_token_is_in_body_not_query           PASSED
 evals/test_pipeline.py::test_test_event_code_only_when_set        PASSED
