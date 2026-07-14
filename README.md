@@ -35,15 +35,22 @@ counts one conversion, not two.
 
 ![Deduplication](docs/dedup.png)
 
-*Same `event_id`, received from Browser and from Server. One conversion.*
+*The full funnel — `View content`, `Complete registration`, `Purchase`. Each one
+arrives twice: from the Browser and from the Server, sharing one `event_id`.
+Meta's own **Deduplicated** label confirms it counts one conversion, not two.*
 
 ### Why server-side tracking exists
 
-In the same screenshot: `View content` arrived from the **Server only** — the
-browser copy never fired.
+On the very first run of this landing page, `View content` reached Meta from the
+**server only**. The browser copy never fired — the Pixel had not finished
+initialising when the event triggered, so `fbq` was lost. The `fetch` to the
+collector was not, because it does not depend on the Pixel.
 
-This was not staged. It happened on the first run. Ad blocker, slow pixel, ITP,
-cookie policy — the cause doesn't matter. The conversion survived anyway.
+Ad blocker, slow pixel, ITP, cookie policy — the cause doesn't matter. The
+browser event vanished and the conversion survived anyway.
+
+That is the entire argument for server-side tracking, and it happened by
+accident on the first attempt rather than being staged for the demo.
 
 ### Losses are caught, named, and priced
 
