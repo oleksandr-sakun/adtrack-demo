@@ -9,3 +9,4 @@ __pycache__/
 .backups/
 adtrack.db.keep
 *.keep
+ZVIT.md

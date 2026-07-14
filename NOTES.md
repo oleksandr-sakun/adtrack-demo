@@ -348,6 +348,66 @@ honest and more instructive than a clean run would have been.
 
 ---
 
+## Late additions
+
+Four things landed after the bulk of this file was written.
+
+### The Pixel ID was hard-coded in the HTML
+
+`fbq('init', '2277246586437973')` sat in `static/index.html`.
+
+A Pixel ID is not a secret — it is visible in the page source of every site that
+runs one. But hard-coding it means anyone cloning the repo silently sends their
+test events into *my* dataset: useless to them, noise for me. It is now injected
+at serve time from `.env`, and the HTML carries `__META_PIXEL_ID__`.
+
+The difference is between a demo you can look at and a demo you can run.
+
+### .env.example must stay empty
+
+Tempting to fill `.env.example` with working values so it "just works" on clone.
+That reintroduces the same bug from the other direction — the template is what
+someone copies into their own `.env`, so real values there send their traffic
+into my dataset.
+
+`.env` (real, gitignored) and `.env.example` (empty template, tracked) are
+deliberately different files. The example carries only safe defaults: API
+version, intervals, retry ceiling.
+
+### .gitignore matched *.db but not .db.keep
+
+A DB snapshot named `adtrack.db.keep` got committed. `*.db` does not match a
+different suffix.
+
+Nothing sensitive was in it — hashed test identifiers, no client data. But it is
+a reminder that a `.gitignore` pattern protects the filenames you thought of, not
+the ones you didn't. The check that actually works is reading `git status --short`
+before every commit, not trusting the ignore file.
+
+### Two workers drained the same queue, and nothing broke
+
+During testing, a backgrounded uvicorn and a manually-run `drain_once()` were
+both pulling from the queue at once. The retry counts came out lower than
+expected, which looked like a bug.
+
+It wasn't. Both processes were claiming from the same table, the attempt counter
+is shared, and the ceiling still held. The event was delivered once. This was
+never designed for — it was an accident — but it does demonstrate that the queue
+tolerates more than one consumer, which is the property that makes the eventual
+migration to a standalone worker process cheap.
+
+### Meta's own Deduplicated label
+
+The first dedup screenshot showed two events sharing an `event_id` and required
+a caption explaining that Meta would merge them.
+
+A later run produced something better: Meta groups the pair in the UI and tags
+the server copy **`Deduplicated`** itself. The evidence stopped needing a
+caption. Worth knowing that the label exists — it is the fastest way to confirm
+dedup is actually working rather than assuming it from matching ids.
+
+---
+
 ## What this is not
 
 - Not batched. Deliberately (see above).
