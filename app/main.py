@@ -15,10 +15,11 @@ didn't.
 
 import logging
 import time
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
@@ -118,4 +119,20 @@ async def health():
     }
 
 
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+@app.get("/")
+async def landing() -> HTMLResponse:
+    """
+    The Pixel ID is injected at serve time rather than hard-coded in the HTML.
+
+    It is not a secret — a Pixel ID is visible in the page source of every site
+    that runs one. But hard-coding it means anyone cloning this repo silently
+    sends their test events into MY dataset, which is both useless to them and
+    noise for me. Templating it keeps the repo runnable by anyone with their own
+    .env, which is the difference between a demo you can look at and a demo you
+    can run.
+    """
+    html = (Path(__file__).parent.parent / "static" / "index.html").read_text()
+    return HTMLResponse(html.replace("__META_PIXEL_ID__", settings.meta_pixel_id))
+
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
